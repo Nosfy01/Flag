@@ -2,50 +2,63 @@
 A Javascript object that assigns multiple booleans to bits in an integer.
 
 ## Background
-I was working for a company that sells their products online (on different plarforms) and I was in charge for one of the platforms. So among other things, I needed to transfer our products data to servers and use that data for assignement to the relevant categories. I didn't have much freedom in terms of information I could use for myself but I was allowed to use a couple of labels (strings that were not automatically pubished with the rest of the fields). So I decided to use a set of flags for one of those labels, basically booleans combined and expressed as bits in an integer. It has the advantage of being lightweight to transfer and easy to read and write. It also gives tools to process many flags rapidly. I think / hope this simple project can be useful to someone else.
+My first needs for this snippet / object were related to products for ecommerce but it was made so that it can be useful in many applications. Please keep this in mind when viewing the examples, they are related to online sales only because they provide an easy to undestand context.
 
-## How to use?
+Many servers that offer the possibility to run Javascript code only support old versions of JS. I could maintain two versions (legacy and es6+) but I at least for now a good compromise is to go with "_recent_" Javascript code complemented with a few polyfills.
 
-Provide keys as strings in a Javascript array.
+## Reference
 
-Use that array as the unique parameter.
+**new Flag(**_keys_**)**;
+
+A Flag instance is an object that assigns the bits of an integer as booleans to the _keys_ it received in a javascript array.
+
+The index (position in the array) of each key is what determines the bit value associated with it.
 
 ```javascript
 const labels = ["outOfStock", "onSale", "backOrder", "newItem", "discontinued"];
 const productsFlag = new Flag(labels);
 ```
-The index of the keys (strings in the array) is what determines the bit associated with each of them.
+Here is how the values of "_labels_" will be assigned
 
-In this example:
+Index | Key Name | Op | Value (when true)
+------|----------|----|------------------
+0 | outOfStock | 2 ** 0 | 1
+1 | onSale | 2 ** 1 | 2
+2 | backOrder | 2 ** 2 | 4
+3 | newItem | 2 ** 3 | 8
+4 | discontinued | 2 ** 4 | 16
 
-"outOfStock" = 1 when true, "onSale" = 2, "backOrder" = 4 etc.
-
-Values can be read / assigned in a couple of ways:
-
-* Each key becomes a property that can be set / read
-* The property "value" is the integer itself. Setting it affects all keys. (and all keys affect it too)
-* The Flag instance has "valueOf" and [Symbol.toPrimitive] set in the prototype so when used directly it outputs the "value"
+The integer itself can be get / set through the "_value_" key. Each of the keys can be get / set like traditional boolean properties of an object.
 
 ```javascript
-// This will set productsFlag.value to 2 (if all others are false)
-productsFlag.onSale = true;
+productsFlag.backOrder = true;
+console.log(productsFlag.value);
+// outputs 4
 
-// This will set "outOfStock" (1), "onSale" (2) and "backOrder" (4) to true => 4 + 2 + 1 = 7
-// And all others to false.
-productsFlag.value = 7;
+productsFlag.newItem = true;
+// Now "value" becomes 12 => backOrder (4) + newItem (8) = 12;
+console.log(productsFlag.value);
+// outputs 12
 
-console.log(`Flags value: ${productsFlag}`);
-// Output: 'Flags value: 7'
+productsFlag.value = 17;
+// This sets "outOfStock" and "discontinued" to true. All others to false.
 ```
-What is particularly useful is the possibility to create custom filters.
 
-The function "getCheck" will return another function that checks for the values corresponding to the ones set in the parameter. This is independant of the "value" property of the instance. It is used for checking multiple flag values rapidly based on the keys and filter provided.
+### getCheckValues
+
+A Flag instance can use the values of its keys (see table above) to generate a filter function. What tells it how to make the filter is an object that contains the needed keys assigned to the needed values.
+
+The benefit is that we can easily obtain many distinct functions that are fast to execute and can be used in loops without creating Flag instances for each integer.
+
+Suppose you have many objects (products) that contain a property representing values of a Flag (an integer), let's say this property is named "_flags_". You might want to identify the products with flags property corresponding **new** and **on sale**, and want to make sure they're not **out of stock**.
+
 ```javascript
-const isNewAndOnSale = productsFlag.getCheck({ "newItem": true, "onSale": true, "outOfStock": false });
+// isNewAndOnSale is in no way influenced by the value property of productsFlag
+// productsFlag is only using key values to generate the filter function.
+const isNewAndOnSale = productsFlag.getCheckValues({ "newItem": true, "onSale": true, "outOfStock": false });
 
-// Let's say you have many products with the following flag values
-// (extracted and combined in an array here for simplicity)
-// You can then use the above function to select only the ones that match the given criterias
+// For simplicity, let's assume the array here below is an array of product objects
+// and that we access each one's flags property to obtain the value.
 [5, 8, 13, 10, 15, 31, 17, 14].forEach(n => {
   if (isNewAndOnSale(n)) {
     console.log(`${n} matches`);
@@ -53,3 +66,4 @@ const isNewAndOnSale = productsFlag.getCheck({ "newItem": true, "onSale": true, 
 });
 // In this case, the products corresponding to the values 10 and 14 would match
 ```
+
